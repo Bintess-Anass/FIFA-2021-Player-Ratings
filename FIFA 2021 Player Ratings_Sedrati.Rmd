@@ -1,0 +1,904 @@
+---
+title: "FIFA_2021_Player_Ratings_Sedrati"
+author: "Anass Sedrati"
+date: "June 20, 2021"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 4
+    latex_engine: xelatex
+    fig_caption: yes
+  html_document:
+    toc: yes
+    toc_depth: '4'
+    df_print: paged
+---
+
+
+# Capstone Project: IDV Learners - Choose your Own - Project Report
+
+## 1.	Introduction
+### 1.1 Aim
+The aim of the present project is to apply machine learning techniques beyond standard linear regression in a dataset of our choice, as it is an opportunity to branch out and discover some new data. Given my personal interest for football (called soccer in the USA), and because the European cup is being played at this moment, I chose a dataset related to this sport.
+
+### 1.2 Method
+This project follows the standard data science project methodology suggested by the [DataScience  Foundation](https://datascience.foundation/methodology). This methodology contains the following steps: Data collection, examination, cleaning & processing, modelling, prediction, visualization, and continuation.
+
+Given operational constraints in my computer, and the relative big size of data to be treated, I chose from the start to apply three machine learning techniques in this project, as I am confident that they can be applied in my computer. These techniques are: (i) Linear Regression, (ii) Decision Tree, and (iii) Random Forest. The metric used to evaluate these techniques will be the same one used in the first project (MovieLens), and it is the Root Mean Squared Error (abbreviated RMSE), calculated with this formula below:
+
+$$\mbox{RMSE} = \sqrt{\frac{1}{N} \sum_{u,i}^{} \left( \hat{y}_{u,i} - y_{u,i} \right)^2 }$$
+I will divide my data into two main sets: Set 1 (70% of the data) and Set 2 (30% of the data). Set 1 will then be divided into two sets: training set (70% of Set 1) and test set (30% of Set 1). Set 2 is our validation set, and will only be used for final hold-out testing to provide the final results for our work.
+
+### 1.3	Data Collection
+I chose a dataset entitled FIFA 21 Complete Player Dataset that I downloaded from Kaggle at [this link](https://www.kaggle.com/ekrembayar/fifa-21-complete-player-dataset). The dataset contains various metrics related to football players in the electronic game FIFA 21. Among these metrics, I chose to predict the market value (called Value - The price at which a team buys a player) for a football player. The original dataset contains 107 columns and was disturbing my computer already when loading. I have therefore removed a number of columns that I considered superfluous, especially that their information was available in other columns that I kept. I will explain the details of what I have changed in the section (data cleaning).
+
+The dataset that I have appended to the project and in Github is the one I have cleaned (in Excel), with fewer columns and is easier to handle in my machine. For those wishing to check the full dataset, they can do so by consulting the link I provided earlier.
+
+```{r data collection, warning=FALSE, message=FALSE, include=FALSE}
+#PACKAGES
+options(warn=-1)
+
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(readxl)) install.packages("readxl", repos = "http://cran.us.r-project.org")
+if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
+if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+if(!require(ggplot2)) install.packages ("ggplot2" , repos="http://cran.us.r-project.org")
+if(!require(scales)) install.packages ("scales" , repos="http://cran.us.r-project.org")
+if(!require(dplyr)) install.packages ("dplyr" , repos="http://cran.us.r-project.org")
+if(!require(corrplot)) install.packages ("corrplot" , repos="http://cran.us.r-project.org")
+if(!require(RCurl)) install.packages ("RCurl" , repos="http://cran.us.r-project.org")
+if(!require(hydroGOF)) install.packages ("hydroGOF" , repos="http://cran.us.r-project.org")
+if(!require(rpart)) install.packages ("rpart" , repos="http://cran.us.r-project.org")
+if(!require(randomForest)) install.packages ("randomForest" , repos="http://cran.us.r-project.org")
+if(!require(knitr)) install.packages ("knitr" , repos="http://cran.us.r-project.org")
+if(!require(magrittr)) install.packages ("magrittr" , repos="http://cran.us.r-project.org")
+if(!require(Hmisc)) install.packages ("Hmisc" , repos="http://cran.us.r-project.org")
+if(!require(gridExtra)) install.packages ("gridExtra" , repos="http://cran.us.r-project.org")
+if(!require(rpart.plot)) install.packages ("rpart.plot" , repos="http://cran.us.r-project.org")
+if(!require(kableExtra)) install.packages ("kableExtra" , repos="http://cran.us.r-project.org")
+
+library(tidyverse)
+library(readxl)
+library(caret)
+library(data.table)
+library(ggplot2)
+library(scales)
+library(dplyr)
+library(corrplot)
+library(RCurl)
+library(hydroGOF)
+library(rpart)
+library(randomForest)
+library(knitr)
+library(magrittr)
+library(Hmisc)
+library(gridExtra)
+library(rpart.plot)
+library(kableExtra)
+
+#DATA COLLECTION
+
+#Read the Excel Document and store it in FIFA 
+FIFA <- read_excel("FIFA 2021 Statistics.xlsx")
+
+#Explore Data
+head(FIFA)
+str(FIFA)
+summary(FIFA)
+```
+The dataset has 17.125 rows, each representing a specific football player in FIFA 2021. These players are described by the nine metrics and variables presented in table 1 below (they are the columns of our dataset).
+
+*Table 1. Variables within the FIFA dataset*
+
+```{r str, echo=FALSE}
+data.frame(Variable = names(FIFA),
+           Class = sapply(FIFA, typeof),
+           Example = sapply(FIFA, function(x) paste0(head(x),  collapse = ", ")),
+           row.names = NULL) %>% 
+  kable(format="latex", booktabs=TRUE) %>%
+  kable_styling(latex_options=c("scale_down","hold_position"))
+```
+
+## 2. Analysis
+### 2.1	Data examination
+Our dataset has 9 variables (columns) describing player information. The original Kaggle dataset did not provide an explanation of them. Luckily, as a FIFA fan myself, I could recognize them, and provide therefore my explanation here below: \⎵⎵
+
+* Name - Name of the football player \⎵⎵
+* Age - Age of the football player \⎵⎵
+* Rating - Player rating in FIFA 2021 \⎵⎵
+* Nationality - Country of citizenship of the football player \⎵⎵
+* Club - Club where the player currently plays \⎵⎵
+* Position - Position where the player plays (such as goalkeeper or defender) \⎵⎵
+* Potential - Potential evolution of the player in the future (also interpreted as future rating) \⎵⎵
+* Value - Market value (price) of the player in € \⎵⎵
+* Total Stats - A number summing the player skills accross different areas \⎵⎵
+
+It is worth to mention that the original dataset contains 107 columns, which cannot all be explained in this report, therefore my decision to cut them before introducing the information in Rstudio.
+
+We can examine our final dataset using the head function in order to have an understanding of the structure and type of information present in it. These can be seen in table 2 below.
+
+ *Table 2.Head of the FIFA 2021 players dataset*
+```{r head, echo=FALSE}
+#FIFA dataset head
+kable(head(FIFA), format="latex", booktabs=TRUE) %>%
+  kable_styling(latex_options=c("scale_down","hold_position"))
+```
+
+Table 2 shows that data is rather clean and well prepared. In fact, and as I mentioned, I have prepared it well before putting it in R, as will be explained in the next section.
+
+### 2.2	Data cleaning & processing
+After familiarizing with the dataset, I decided that the variable that I would like to predict for every player will be the market value (in Euro). Therefore, I had to identify the elements that would eventually affect/help predict it.
+
+Being used to play FIFA in Playstation, I know that the total statistics are an important factor to judge a player. They are counted as a combination of several more detailed statistics (such as the ability to defend, dribble, play with the head, etc.). The dataset in Kaggle contains in fact many columns that I have removed (mentality, long shot, stamina, defense, dribbling, and many others), for two reasons. The first reason is that I cannot have all these columns in the dataset (I have tried in the beginning, but the computer was very slow even processing the initial data), and the second reason was that these statistics are part of the column "Total Stats", that is of course in the final dataset.  I recognize that removing these variables can affect the quality of the prediction, but given the hardware limitations that I presented, this was the only way to be able to achieve this project.
+
+I have also removed columns that were not relevant for this specific project, such as player picture, club logo, gender (all players are male). Moreover, my predictions do not take into consideration the variables "Nationality" and "Rating", even if they can have an impact on a player value. The reason is to keep the scope of this project doable in the requested amount of time that I have. The variable "rating" is already included in the total statistics, so removing it can be logical.
+
+To sum up, in this project I will be predicting the value of a FIFA 2021 player (in €) based on the following variables: Total Statistics, Club, Age, Position and Potential.
+
+```{r fix data, include=FALSE}
+#Get Value, Total Statistics, Age and Potential as numerical values
+FIFA <- FIFA %>% mutate(Value=as.numeric(Value),
+                        `Total Stats`=as.numeric(`Total Stats`),
+                        Age=as.numeric(Age),
+                        Potential=as.numeric(Potential))
+
+#Get Club and Position to factor as categorical
+FIFA <- FIFA %>% mutate(Club=as.factor(Club),
+                        Position=as.factor(Position))
+
+#Ensure that changes were well made
+str(FIFA)
+
+#Remove all NAs
+FIFA <- na.omit(FIFA)
+
+#Select only the variables we are interested in (Drop Rating and Nationality)
+FIFA <- FIFA %>% select(Name,Age,Club,Position,Potential,Value,`Total Stats`)
+
+#Summary of our data
+summary(FIFA)
+```
+
+### 2.3 Modelling
+In order to go into the details of what really affects the value of a player I will implement some hypothesis related to the five variables that I have kept, and test them to see if they do apply. Each hypothesis will be tested towards the 15 most expensive players (in terms of value) to have an idea and see if it makes sense.
+
+Hypothesis 1. Most expensive players have the highest total statistics in FIFA 2021. The verification can be seen in figure 1 below:
+
+```{r most expensive players, warning=FALSE, message=FALSE, include=FALSE}
+#Hypothesis: Most expensive players are the highest rated
+Most_expensive <- FIFA %>%
+  arrange(desc(Value)) %>%
+  group_by(Name)%>%
+  head(15)
+
+min(Most_expensive$`Total Stats`) #Understand the size range
+min(FIFA$`Total Stats`) # Lowest statistics in all FIFA 2021 to compare with
+```
+
+```{r plotting expensive players and stats , warning=FALSE, message=FALSE, echo=FALSE}
+Most_expensive%>%
+  ggplot(aes(Name,Value, color=`Total Stats`, size=`Total Stats`))+
+  geom_point()+
+  scale_size_continuous(limits=c(1300, 2300), breaks=seq(1300, 2300, by=200))+
+  scale_color_continuous(limits=c(1300, 2300), breaks=seq(1300, 2300, by=200), low = "cyan",high = "red") +
+  coord_flip()+
+  scale_y_continuous(labels = scales::comma_format(big.mark = '.'))+
+  labs(x="Player", y="Value (Euro)")+
+  guides(color= guide_legend(), size=guide_legend())
+
+```
+
+*Figure 1. Most expensive players per Total Statistics*
+
+Figure 1 shows that the most expensive players are among the highest rated as well. An exception stands however for the goalkeepers (which is normal, given that their statistics are not complete, and are usually low for many skills that are not often used by them). In table 3 below, we can see the list of the 15 players with highest statistics.
+
+```{r players with higher statistics, warning=FALSE, message=FALSE, echo=FALSE}
+#Players with highest total statistics
+Highest_Stats <- FIFA %>%
+  arrange(desc(`Total Stats`)) %>%
+  group_by(Name) %>%
+  head(15)
+
+#kable Highest statistics
+kable(Highest_Stats, format="latex", booktabs=TRUE) %>%
+    kable_styling(latex_options=c("scale_down","hold_position"))
+```
+
+Table 3 shows that the players with the highest statistics are not always the most expensive ones. Some players are however present in both table 3 and picture 1 (meaning they are very expensive and have very high statistics). Players with high statistics cover a high range of values (between  20 and 87 million €), which is much higher than the average of the dataset (2.5 million €). Let us now discover more about the data.
+
+*Table 3. Players with highest total statistics in the dataset*
+
+Hypothesis 2. Playing at some clubs makes players more valuable.
+
+Below we can see initial information related to this hypothesis:
+
+```{r Valuable players per club, warning=FALSE, message=FALSE, echo=FALSE}
+# Most valuable players per club
+Most_expensive %>%
+  ggplot(aes(Name,Value, fill=Club))+
+  geom_col()+
+  coord_flip()+
+  labs(x="Player", y ="Value (Euro)")+
+  scale_y_continuous(labels = scales::comma_format(big.mark = '.'))+
+  guides(color=guide_legend())
+```
+
+*Figure 2. Most expensive players and what club they play for*
+
+```{r information about clubs, warning=FALSE, message=FALSE, include=FALSE}
+#Get information about clubs to have more understanding of the data
+str(FIFA)
+summary(FIFA$Club)
+```
+It is very difficult to draw conclusions from this picture, as no club is specifically distinguished in this list. Moreover, there are 917 clubs present in the dataset, so a deeper investigation is needed to work with clubs. Figure 3 shows the 15 first clubs in terms of most valuable players (by calculating the mean value of their players).
+
+```{r 15 richest clubs, warning=FALSE, message=FALSE, echo=FALSE}
+#15 Clubs with most valuable players
+FIFA %>% group_by(Club) %>%
+  mutate(Club_Value=mean(Value)) %>%
+  summarise(Club,Club_Value) %>%
+  arrange(desc(Club_Value)) %>%
+  distinct() %>%
+  head(15) %>%
+  ggplot(aes(Club,Club_Value, color=Club, fill=Club))+
+  geom_col()+
+  guides(color=FALSE, fill=guide_legend(ncol=2))+
+  theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())+
+  scale_y_continuous(labels = scales::comma_format(big.mark = '.'))+
+  labs(x="Club", y="Mean Player Value (Euro)")
+```
+
+*Figure 3. 15 Clubs with most valuable players*
+
+From this figure, we can already see that some clubs have a rather higher mean value for their players. If instead of looking at 15 clubs, we look at 100, we can see that the difference becomes bigger as can be observed in figure 4 below (I had to hide the legends as they took a very big part of the plot).
+
+```{r 100 richest clubs, warning=FALSE, message=FALSE, echo=FALSE}
+#100 Clubs with most valuable players
+FIFA %>% group_by(Club) %>%
+  mutate(Club_Value=mean(Value)) %>%
+  summarise(Club,Club_Value) %>%
+  arrange(desc(Club_Value)) %>%
+  distinct() %>%
+  head(100) %>%
+  ggplot(aes(Club,Club_Value, color=Club, fill=Club))+
+  geom_col()+
+  guides(color=FALSE, fill=FALSE)+
+  theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())+
+  scale_y_continuous(labels = scales::comma_format(big.mark = '.'))+
+  labs(x="Club", y="Mean Player Value (Euro)")
+```
+
+*Figure 4. 100 Clubs with most valuable players*
+
+From figure 4, we can indeed observe that there are consequent differences between different clubs, and that therefore, it is important to take the club into consideration when predicting the value of a player.
+
+The next variable that we are interested in is the age of a player. Similar to what we did to clubs, we show in figure 5 below the average value of players in this dataset per age.
+
+```{r Value per Age, warning=FALSE, message=FALSE, echo=FALSE}
+#Mean players value per age
+FIFA %>% group_by(Age) %>%
+  mutate(Age_Value=mean(Value)) %>%
+  summarise(Age,Age_Value) %>%
+  arrange(desc(Age_Value)) %>%
+  distinct() %>% 
+  ggplot(aes(Age,Age_Value, color=Age, fill=Age))+
+  geom_col()+
+  guides(color=FALSE, fill=FALSE)+
+  scale_y_continuous(labels = scales::comma_format(big.mark = '.'))+
+  labs(x="Age", y="Mean Player Value (Euro)")
+```
+
+*Figure 5. Players mean value per age*
+
+Figure 5 shows that players have their peek value around the age of 28.
+
+In order to remove the outliers and to have more exact predictions, I have removed players aged more than 43, as the ones present in this dataset are (i) few, and (ii) not representative of a regular football player (who usually retires before 40 years old).
+
+```{r select age, warning=FALSE, message=FALSE, include=FALSE}
+FIFA <- FIFA %>% filter(Age<44)
+view(FIFA)
+```
+
+Hypothesis 3. Position of football players (in the field) affects their market value.
+
+To explore this hypothesis, we check the 20 more valuable players and their positions. These can be seen in figure 6 below.
+
+```{r most valuable players per position, warning=FALSE, message=FALSE, echo=FALSE}
+#Most valuable players per position
+ FIFA %>%
+  arrange(desc(Value)) %>%
+  group_by(Name)%>%
+  head(20) %>%
+  ggplot(aes(Name,Value,fill=Position))+
+  geom_col() +
+  coord_flip() + 
+  labs(x="Player", y="Value (Euro)")+
+  scale_y_continuous(labels = scales::comma_format(big.mark = '.'))+
+  guides(color= guide_legend())
+```
+*Figure 6. Most expensive players per positions*
+
+Out of the 15 available positions, only "half" (7) are present in this list, and most of these expensive players have an offensive profile (9 players are either striker, left wing or right wing). To investigate the player positions further, I looked into the positions per club.
+
+```{r value of position per club, warning=FALSE, message=FALSE, echo=FALSE}
+#Most expensive positions per club
+FIFA %>%
+  ggplot(aes(Position, Value, fill=Club))+
+  geom_col() +
+  scale_y_continuous(labels = scales::comma_format(big.mark = '.'))+
+  guides(color= guide_legend(), fill=FALSE)+
+  labs(y="Total Value (Euro)")
+```
+
+*Figure 7. Player value depending on the position per club*
+
+I have removed the club names from the legends (as there are 917 clubs), but all positions are present in all clubs at a rather equal percentage. We can clearly see that some positions are more valued than others (even if there is also the possibility that some positions have actually more players than others). The most expensive players are strikers, central defenders, and attacking midfielders. But there is definitely an effect made by the players position on their value.
+
+Hypothesis 4. The potential of a player (a rating number given to a player with prospective of a bright future) affects its value. Figure 8 shows that 15 most expensive players in the dataset and their "potential".
+
+```{r potential of most expensive, warning=FALSE, message=FALSE, echo=FALSE}
+#Most expensive per potential
+Most_expensive %>%
+  ggplot(aes(Name,Potential, fill=Value))+
+  geom_col() +
+  coord_flip() + 
+  guides(color= guide_legend())+
+  scale_fill_continuous(label = scales::comma_format(big.mark = '.'))+
+  labs(x="Player")
+```
+
+*Figure 8. Potential of the most valuable players in FIFA 2021*
+
+```{r information potential, warning=FALSE, message=FALSE, include=FALSE}
+#Get information about potential for players
+Most_expensive$Potential
+Most_expensive$Potential[which.min(Most_expensive$Potential)]
+Most_expensive$Potential[which.max(Most_expensive$Potential)]
+FIFA$Potential[which.min(FIFA$Potential)]
+FIFA$Potential[which.max(FIFA$Potential)]
+mean(FIFA$Potential)
+```
+
+From figure 8, and given that the mean potential is around 72, we can deduce that the most valuable players have a very high potential (the player with the highest potential in the dataset "95", is in the list). In particular, the lowest potential in the list of most valuable players is 89, which is a high number. It is a strong indication that this hypothesis is likely to be true. To investigate this further, I checked the players value by potential for all the players in the dataset. Since some groups have much fewer players, I did not show the sum of value, but rather the mean value for players having a given potential.
+
+```{r Value of potential, warning=FALSE, message=FALSE, echo=FALSE}
+#Mean value of player per its potential
+FIFA %>%
+  group_by(Potential)%>%
+  mutate(Mean_Pot = mean(Value)) %>% 
+  summarise(Potential, Mean_Pot) %>% distinct() %>%
+  ggplot(aes(Potential,Mean_Pot, fill=Potential)) +
+  geom_col() +
+  scale_y_continuous(labels = scales::comma_format(big.mark = '.'))+
+  guides(color= guide_legend(), fill=FALSE)+
+  labs(y="Player Mean value(Euro)")
+```
+
+*Figure 9. Players mean value per Potential*
+
+From figure 9, it is rather obvious that the potential given to a player in FIFA 2021 is directly related with his value, and that the higher the potential is, the more expensive the player is.
+
+To summarize what we have seen until now, all the variables we have studied seem to impact a player's value, with different extends of course. Figure 10 below explains how total statistics, club, position and potential are related to a player's value.
+
+```{r players value summary, warning=FALSE, message=FALSE, echo=FALSE}
+#Summarizing relations for a player's value
+Value_Club <- ggplot(FIFA, aes(x=`Total Stats`, y=log(Value), color=Club))+
+  geom_point(size=1, shape=15)+
+  geom_smooth(method ="loess") +
+  labs(x="Total Statistics" , y="Value")+
+  guides(color=FALSE)+
+  theme_minimal()
+
+Value_Position <- ggplot(FIFA, aes(x=Position, y=log(Value), color=Potential))+
+  geom_point(size=1, shape=15)+
+  geom_smooth(method ="loess") +
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(x="Position" , y="Value")
+
+summary_Value <- grid.arrange(Value_Club, Value_Position,
+                              ncol=1, nrow=2)
+```
+
+*Figure 10. Summary of player related data variables that are going to be used to predict a player's value*
+
+It is very complicated to draw any straight forward conclusions from figure 10, especially that there is a wide range of clubs that cannot be very clear in the first graph. In order to study the correlations further, I went on the check how each of the variables we have correlate with the players' value. In particular, I am using total statistics as the main variable, and add other variables to it. For this I used Spearman's rank correlation coefficient, to make sure that the outliers are limited to the value of their ranks. Let us see then in the figures below the different correlations.
+
+```{r correlation value and total stats, warning=FALSE, message=FALSE, echo=FALSE}
+#Correlation between players value and total statistics
+Value_Stat_Cor <- FIFA %>% select("Value","Total Stats")
+cor_stat <- cor(Value_Stat_Cor, use="pairwise.complete.obs", method="spearman")
+plot_stat <- corrplot.mixed(cor_stat, mar=c(0,0,1,0), lower="color", upper="number", number.cex = 1.5, tl.col = "black")
+```
+
+*Figure 11. Correlation between players value and total statistics*
+
+From this figure, we can observe that there is a good (and positive) correlation between a player's value and his total statistics in FIFA 2021. Let us see how the other variables are doing when added to the statistics.
+
+```{r correlation value of clubs and statistics, warning=FALSE, message=FALSE, echo=FALSE}
+#Get data grouped by club
+Value_Clubs <- FIFA %>% select ("Club","Value","Total Stats") %>%
+  group_by(Club) %>%
+  summarise(Value =sum(Value), Stats =mean(`Total Stats`))
+
+#Check correlations for club grouping
+Value_Clubs_cor <- Value_Clubs %>% select ("Value", "Stats")
+cor_club <- cor(Value_Clubs_cor, use="pairwise.complete.obs", method="spearman")
+plot_club <- corrplot.mixed(cor_club, mar=c(0,0,1,0), lower="color", upper="number", number.cex = 1.5, tl.col = "black")
+```
+
+*Figure 12.Correlation between value of a specific club and total statistics*
+
+From figure 12, we can see the the correlation is still consequent, even that it is less than the previous figure. It is positive, meaning that the bigger the value of a player in a specific club, the higher his statistics will be. The next variable we correlate now to is age as seen in figure 13 below.
+
+```{r correlation value of age and statistics, warning=FALSE, message=FALSE, echo=FALSE}
+#Get data grouped by age
+Value_Age <- FIFA %>% select ("Age","Value","Total Stats") %>%
+  group_by(Age) %>%
+  summarise(Value =sum(Value), Stats =mean(`Total Stats`))
+
+#Check correlations for age grouping
+Value_Age_cor <- Value_Age %>% select ("Value", "Stats")
+cor_age <- cor(Value_Age_cor, use="pairwise.complete.obs", method="spearman")
+plot_age <- corrplot.mixed(cor_age, mar=c(0,0,1,0), lower="color", upper="number", number.cex = 1.5, tl.col = "black")
+```
+
+*Figure 13.Correlation between value of a specific age and total statistics*
+
+Interestingly, we found from the matrix above that the correlation between the value of a player given his age is strongly correlated with his total statistics. The correlation is also positive, meaning that when one is growing, so does the other.
+
+```{r correlation value of position and statistics, warning=FALSE, message=FALSE, echo=FALSE}
+#Get data grouped by position
+Value_Positions <- FIFA %>% select ("Position","Value","Total Stats") %>%
+  group_by(Position) %>%
+  summarise(Value =sum(Value), Stats =mean(`Total Stats`))
+
+#Check correlations for position grouping
+Value_Positions_cor <- Value_Positions %>% select ("Value", "Stats")
+cor_position <- cor(Value_Positions_cor, use="pairwise.complete.obs", method="spearman")
+plot_position <- corrplot.mixed(cor_position, mar=c(0,0,1,0), lower="color", upper="number", number.cex = 1.5, tl.col = "black")
+```
+*Figure 14.Correlation between value of a specific position and total statistics*
+
+From figure 14, we can observe that the correlation between the value of a player given his position in the field is rather weakly correlated with his total statistics. Moreover, the correlation is negative, meaning that when one increases, the other decreases.
+
+```{r correlation value of potential and statistics, warning=FALSE, message=FALSE, echo=FALSE}
+#Get data grouped by potential
+Value_Potential <- FIFA %>% select ("Potential","Value","Total Stats") %>%
+  group_by(Potential) %>%
+  summarise(Value =sum(Value), Stats =mean(`Total Stats`))
+
+#Check correlations for potential grouping
+Value_Potential_cor <- Value_Potential %>% select ("Value", "Stats")
+cor_potential <- cor(Value_Potential_cor, use="pairwise.complete.obs", method="spearman")
+plot_potential <- corrplot.mixed(cor_potential, mar=c(0,0,1,0), lower="color", upper="number", number.cex = 1.5, tl.col = "black")
+```
+
+*Figure 15. Correlation between value of a specific potential and total statistics*
+
+Figure 15 explains to us that when grouped by potential, the player's value is highest correlated with the total statistics, compared to the other variables that we studied.
+
+As a summary of this modeling analysis, we can say indeed that the an important variable that affects the value of a FIFA 2021 football player is his total statistics, but his potential seems to affect the value even more. More importantly, we saw clearly that combining variables with each other bring even bigger correlation, and will for sure bring a better prediction. This is due to the fact the other variables that have a consequent impact as well. In fact, by looking at the figures above, we can see that strong correlations were emerging. From this work and figures above, we can say that the order of importance of the value prediction variables is the following: (1) Potential - (2) Age - (3) Total Statistics - (4) Position - (5) Club.
+
+### 2.4	Prediction
+
+In this section, I present the three prediction models that I have worked with to train and test my data. I have first split the dataset into test (Set 1 - 70%) and validation (Set 2 - 30%) sets, then split the test set (Set 1) into training (70%) and test set (30%). The validation set will only be used for the final calculations related to the results (part 3 of this work). The three predictions models that I have used are: Linear Regression, Classification and Regression Trees, and Random Forest.
+
+```{r creating the sets, include=FALSE}
+#Create test and validation data sets
+# The Validation subset will be 30% of the total dataset.
+set.seed(1)
+test_index <- createDataPartition(y=FIFA$Value, times = 1, p = 0.3, list = FALSE)
+test <- FIFA[-test_index,]
+validation <- FIFA[test_index,]
+
+#Verify size of test and validation
+dim(test) 
+dim(validation)
+
+#Split Test into training set (70%) and test set (30%)
+test_index_test <- createDataPartition(y=test$Value, times = 1, p = 0.3, list = FALSE)
+
+train_set <- test[-test_index_test,]
+test_set <- test[test_index_test,]
+
+#Verify size of training and test sets
+dim(train_set)
+dim(test_set)
+```
+
+```{r rmse, warning=FALSE, message=FALSE, include=FALSE}
+# Compute the dataset's mean rating, test the RMSE
+# Mean of observed values
+set.seed(1)
+mu_train <- mean(train_set$Value)
+mu_test <- mean(test$Value)
+
+#RMSE Definition
+RMSE <- function(true_ratings, predicted_ratings){
+  sqrt(mean((true_ratings - predicted_ratings)^2))
+}
+
+#Mean RMSE to compare
+mean_rmse <- RMSE(mu_train,test_set$Value)
+mean_rmse
+
+# Results table 
+test_rmse_results <- data_frame(Method="Mean",
+                            RMSE = mean_rmse )
+
+test_rmse_results %>% knitr::kable() 
+```
+
+#### 2.4.1 Linear regression
+Linear regression is a simple supervised machine learning algorithm where the approach is to model the relationship between a scalar response and one or more explanatory variables (also known as dependent and independent variables). It is used to predict values within a continuous range (such as numbers) and is by consequence a good starting technique for us to predict a player´s value.
+
+Linear Regression's main limitation is that it assumes linearity between the dependent variable and the independent variables, while this might not always be the case in concrete scenarios.
+
+In a simple linear regression, the following formula is used for prediction:
+$$Y_{u,i} = \mu + \varepsilon_{u,i}$$
+
+In our case, we are using a multivariate linear regression, as we have many variables that we would like to combine. The formula used to predict a players value adding different effects and biases will be:
+
+$$Y_{u,i} = \mu + b_i + b_u + \varepsilon_{u,i}$$
+Biases that are tested are the player and potential, that are then combined with age bias, before adding all earlier mentioned to total statistics bias. As observed, we gave the priority to the variables that had the highest impact according to the conclusions we had in our modeling section.
+
+```{r linear regression, warning=FALSE, message=FALSE, include=FALSE}
+set.seed(1)
+# Player effect
+py <- train_set %>%
+  group_by(Name) %>%
+  summarise(p_y = mean(Value - mu_train))
+
+y_hat_py <- mu_train + test_set %>%
+  left_join(py, by='Name') %>%
+  .$p_y
+
+player_rmse <- rmse(y_hat_py, test_set$Value, na.rm=TRUE)
+player_rmse
+
+# Results table 
+test_rmse_results <- bind_rows(test_rmse_results,
+                           data_frame(Method="Player Effect",
+                                      RMSE = player_rmse ))
+test_rmse_results %>% knitr::kable()  
+ 
+# Potential effect
+p <- train_set %>% 
+  group_by(Potential) %>% 
+  summarise(p_t = mean(Value - mu_train))
+
+pred_p <- mu_train + test_set %>% 
+  left_join(p, by="Potential") %>%
+  .$p_t
+
+mean_rmse_p <- rmse(pred_p, test_set$Value, na.rm=TRUE)
+mean_rmse_p
+
+# Results table 
+test_rmse_results <- bind_rows(test_rmse_results,
+                           data_frame(Method="Potential Effect",
+                                      RMSE = mean_rmse_p))
+test_rmse_results %>% knitr::kable() 
+
+# Player with Potential effect
+bc <- train_set %>% 
+  left_join(py, by = "Name") %>%
+  group_by(Potential) %>% 
+  summarise(b_c = mean(Value- mu_train-p_y))
+
+pred_bc <- mu_train + test_set %>% 
+  left_join(py, by='Name') %>%
+  left_join(bc, by="Potential") %>%
+  mutate(pred = mu_train + b_c + p_y) %>%
+  .$pred
+
+pp_rmse <- rmse(pred_bc, test_set$Value, na.rm=TRUE)
+pp_rmse
+
+# Results table 
+test_rmse_results <- bind_rows(test_rmse_results,
+                           data_frame(Method="Player and potential Effect",
+                                      RMSE = pp_rmse ))
+test_rmse_results %>% knitr::kable()
+
+#Adding Age effect
+bu <- train_set %>% 
+  left_join(py, by = "Name") %>%
+  left_join(bc, by = "Potential") %>%
+  group_by(Age) %>% 
+  summarise(b_u = mean(Value - mu_train - p_y - b_c))
+
+pred_bu <- mu_train + test_set %>% 
+  left_join(py, by='Name') %>%
+  left_join(bc, by="Potential") %>%
+  left_join(bu, by="Age") %>%
+  mutate(pred_u = mu_train + b_u + b_c + p_y) %>%
+  .$pred_u
+
+Age_rmse <- rmse(pred_bu, test_set$Value, na.rm=TRUE)
+Age_rmse
+
+# Results table 
+test_rmse_results <- bind_rows(test_rmse_results,
+                           data_frame(Method="Player with potential and age Effect",
+                                      RMSE = Age_rmse ))
+test_rmse_results %>% knitr::kable()  
+
+#Adding Total Statistics effect
+ba <- train_set %>%
+  left_join(py, by = "Name") %>%
+  left_join(bc, by = "Potential") %>%
+  left_join(bu, by = "Age") %>%
+  group_by(`Total Stats`) %>% 
+  summarise(b_a = mean(Value- mu_train - p_y - b_c -b_u))
+
+pred_ba <- mu_train + test_set %>% 
+  left_join(py, by='Name') %>%
+  left_join(bc, by="Potential") %>%
+  left_join(bu, by="Age") %>%
+  left_join(ba, by="Total Stats") %>%
+  mutate(pred_age = mu_train + b_a + b_c + b_u + p_y) %>%
+  .$pred_age
+
+stats_rmse <- rmse(pred_ba, test_set$Value, na.rm=TRUE)
+stats_rmse
+
+# Results table 
+test_rmse_results <- bind_rows(test_rmse_results,
+                           data_frame(Method="Player, potential, age, and total statistics Effect",
+                                      RMSE = stats_rmse ))
+test_rmse_results %>% knitr::kable()  
+```
+
+#### 2.4.2 Classification and regression trees (CART)
+
+Decision Tree is a supervised learning technique that can be used both for classification and regression problems, through classifying nodes into trees (either classification tree or regression tree). In decision trees, internal nodes represent the features of a dataset, while branches represent the decision rules, and each leaf node represents the outcome.
+
+Algorithms that are used for building decision trees work usually top-down by selecting at each stage the variable that best divides the set of objects. An important challenge with Decision Trees is the identification of the attribute for the root node in each level. There are two popular attribute selection measures: Information Gain and Gini Index.
+
+Information Gain, measures the change in entropy, and is calculated with following formula:
+$$\mbox{entropy}(j) = -\sum_{k=1}^K \hat{p}_{j,k}\log(\hat{p}_{j,k}), \mbox{ with } 0 \times \log(0) \mbox{ defined as }0$$
+
+and the Gini Index with this one:
+$$\mbox{Gini}(j) = \sum_{k=1}^K \hat{p}_{j,k}(1-\hat{p}_{j,k})$$
+
+An inconvenient when using decision tree is that only one variable is tested at a time (when decisions are made), and decision tree can't handle numeric attributes and missing values and last data may be over-fitted or over-classified, if a small sample is tested.
+
+```{r desicion tree, warning=FALSE, message=FALSE, include=FALSE}
+set.seed(1)
+rpart.control <- rpart.control(minbucket = 1, maxcompete = 4, maxsurrogate = 6, 
+                               usesurrogate = 2, xval = 3,surrogatestyle = 0, maxdepth = 20, na.action = na.exclude) 
+
+#training the tree model
+tree <- rpart(train_set$Value~ .,data = train_set[,-c(1)],control=rpart.control)
+plot(tree, margin = 0.1)
+text(tree, cex = 0.75)
+
+printcp(tree)
+
+#Vizualize the tree
+rpart.plot(tree, type = 2, box.palette ="RdYlGn", shadow.col ="gray", nn=TRUE,roundint=FALSE)
+
+#RMSE of tree
+pred_values_tree = predict(tree,test_set)
+tree_rmse <- rmse(test_set$Value,pred_values_tree)
+tree_rmse
+
+#Results table
+test_rmse_results <- bind_rows(test_rmse_results,
+                           data_frame(Method="Decision tree",
+                                      RMSE = tree_rmse))
+test_rmse_results %>% knitr::kable()  
+```
+
+#### 2.4.3 Random Forest
+
+Random forests or random decision forests are an ensemble learning method for classification, regression and other tasks that operates by constructing a multitude of decision trees at training time. For classification tasks, the output of the random forest is the class selected by most trees. Random forests undertake dimensional reduction methods, treat missing and outlier values. 
+
+An inconvenient of random forests is that their size (consisting of a large number of trees) can make the algorithm very slow, which is a limitation for many people and machines, and is not practical for live predictions.
+
+```{r random forest, warning=FALSE, message=FALSE, include=FALSE}
+#Make variables legal (otherwise the Random forest shows errors)
+names(train_set) <- make.names(names(train_set))
+names(test_set) <- make.names(names(test_set))
+
+#Make Club character instead of factor as random forest cannot handle categorical predictors with more than 53 categories
+train_set$Club <- as.character(train_set$Club)
+test_set$Club <- as.character(test_set$Club)
+
+#Training the model
+set.seed(1)
+rf_model<-randomForest(Value~ ., train_set, ntree=500, importance=TRUE, proximity=TRUE )
+rf_model
+plot(rf_model)
+
+#Best variables that were important in  modeling 
+varImpPlot(rf_model)
+
+#Higher IncNodePurity values indicate more impact on value
+pred_values_forest = predict(rf_model,test_set)
+
+forest_rmse <- rmse(test_set$Value,pred_values_forest)
+forest_rmse
+
+#Results table
+test_rmse_results <- bind_rows(test_rmse_results,
+                           data_frame(Method="Random Forest",
+                                      RMSE = forest_rmse))
+test_rmse_results %>% knitr::kable()  
+```
+
+## 3.	Results
+### 3.1 Visualization
+
+```{r validation, warning=FALSE, message=FALSE, include=FALSE}
+#From testing in the earlier section , I chose to apply the validation data on Total stats and potential effect in linear model
+set.seed(1)
+#################################### Mean RMSE to start with ########################################
+validation_rmse <- RMSE(mu_test, validation$Value)
+validation_rmse
+
+# Results table 
+rmse_results <- data_frame(Method="Mean",
+                            RMSE= validation_rmse/1000000)
+
+rmse_results %>% knitr::kable()  
+
+######################################## Total Statistics effect -Linear regression ############################################
+bts <- test %>%
+  group_by(`Total Stats`) %>%
+  summarise(b_ts=mean(Value-mu_test))
+
+pred_bts <- mu_test + validation %>%
+  left_join(bts, by="Total Stats") %>%
+  .$b_ts
+
+bts_mean_rmse <- rmse(pred_bts, validation$Value, na.rm=TRUE)
+bts_mean_rmse
+
+# Results table 
+rmse_results <- bind_rows(rmse_results,
+                           data_frame(Method="Total Stats Effect - Linear regression",
+                                      RMSE = bts_mean_rmse/1000000))
+rmse_results %>% knitr::kable()  
+
+########################################### Potential effect -Linear regression ##############################################
+bp <- test %>%
+  group_by(Potential) %>%
+  summarise(b_p =mean(Value-mu_test))
+
+pred_bp <- mu_test + validation %>%
+  left_join(bp, by="Potential") %>%
+  .$b_p
+
+bp_mean_rmse <- rmse(pred_bp, validation$Value, na.rm=TRUE)
+bp_mean_rmse
+
+# Results table 
+rmse_results <- bind_rows(rmse_results,
+                           data_frame(Method="Potential Effect - Linear regression",
+                                      RMSE = bp_mean_rmse/1000000))
+rmse_results %>% knitr::kable()  
+
+####################################### Decision tree ####################################################
+set.seed(1)
+Final_rpart.control <- rpart.control(minbucket = 1, maxcompete = 4, maxsurrogate = 6, 
+                               usesurrogate = 2, xval = 3,surrogatestyle = 0, maxdepth = 20, na.action = na.exclude) 
+
+#Training the tree model
+Final_Tree <- rpart(test$Value~ .,data = test[,-c(1)],control=Final_rpart.control)
+plot(Final_Tree, margin = 0.1)
+text(Final_Tree, cex = 0.75)
+
+printcp(Final_Tree)
+
+#Visualize the tree
+rpart.plot(Final_Tree, type = 2, box.palette ="RdYlGn", shadow.col ="gray", nn=TRUE,roundint=FALSE)
+
+#summary(tre)
+Final_pred_values_tree = predict(Final_Tree,validation)
+Final_tree_rmse <- rmse(validation$Value,Final_pred_values_tree)
+Final_tree_rmse
+
+#Results table
+rmse_results <- bind_rows(rmse_results,
+                           data_frame(Method="Decision tree",
+                                      RMSE = Final_tree_rmse/1000000))
+rmse_results %>% knitr::kable()  
+
+###################################################   Random Forest   ####################################################
+
+#Make variables legal (otherwise the Random forest shows errors)
+names(test) <- make.names(names(test))
+names(validation) <- make.names(names(validation))
+
+#Make Club character instead of factor as random forest cannot handle categorical predictors with more than 53 categories
+test$Club <- as.character(test$Club)
+validation$Club <- as.character(validation$Club)
+
+set.seed(1)
+Final_rf_model<-randomForest(Value~ ., test, ntree=500, importance=TRUE, proximity=TRUE )
+Final_rf_model
+plot(Final_rf_model)
+
+#Most important variables in modeling
+varImpPlot(Final_rf_model)
+
+Final_pred_values = predict(Final_rf_model,validation)
+
+Final_forest_rmse <- rmse(validation$Value,Final_pred_values)
+Final_forest_rmse
+
+#Results table
+rmse_results <- bind_rows(rmse_results,
+                           data_frame(Method="Random Forest",
+                                      RMSE = Final_forest_rmse/1000000))
+rmse_results %>% knitr::kable()  
+```
+
+In this project, the aim was to apply machine learning techniques going beyond standard linear regression, and explore a totally new data. Through exploring this FIFA 2021 dataset, and applying decision tree and random forest methods, I believe that I have fulfilled that aim.
+
+I have gathered the results of my findings (RMSE from validation set) from the three machine learning techniques in table 4 below. The table shows how the RMSE (shown in millions) is constantly being improved through the methods (Mean, Linear Regression, Decision Tree, and Random Forest). As noticed, the RMSE value is rather big and I had to check the reason. I found actually four reasons: (1) There is an enormous disparity between the players values, some being very expensive, and some being free, while (2) the dataset is rather small (17000 players in total). The mean player value is around 2.5 Million €, but the variation is big, and many players have values exceeding 80 million €, making the outliers range very big. Also (3), the value of players is in millions, and therefore the variation will also be big, and cannot be shrinked down to tens of Euros, unless having a dataset of billions of players to train with. Finally (4), the total statistics and number of clubs are variable that has a huge range (more than 1000 values for statistics, 917 for the clubs), and therefore requires a much biger dataset than the one we have. This said, I am satisfied with the results I have (there were no calculation mistakes) and believe that the methods were applied in the best way (with of course many improvements that can be implemented in the future).
+
+*Table 4. RMSE results*
+```{r rmse results, warning=FALSE, message=FALSE, echo=FALSE}
+#RMSE Results to be shown in a table
+kable(rmse_results, format="latex", booktabs=TRUE) %>%
+    kable_styling(latex_options=c("hold_position"))
+```
+
+The regression tree generated in this project can be observed in figure 16 below.
+
+```{r tree results, warning=FALSE, message=FALSE, echo=FALSE}
+rpart.plot(Final_Tree, type = 2, box.palette ="RdYlGn", shadow.col ="gray", nn=TRUE,roundint=FALSE)
+```
+
+*Figure 16. FIFA 2021 players value tree*
+
+As noticed, there was a variety of data in the tree, given the complexity of the data that I had, and that some of them were spanning on a large area (such as the number of clubs (917) and the range of total statistics). Moreover, we had a mix of categorical and numerical data, so normalization can be considered in future work.
+
+Figure 17 coming next summarizes the results from our random forest.
+
+```{r random forest results, warning=FALSE, message=FALSE, echo=FALSE}
+varImpPlot(Final_rf_model)
+```
+
+*Figure 17. Summary of Random forest results*
+
+```{r validation prediction, warning=FALSE, message=FALSE, include=FALSE}
+# Potential effect
+pot <- test %>% 
+group_by(Potential) %>% 
+summarise(pot_ = mean(Value - mu_test))
+
+pred_pot <- mu_test + validation %>% 
+left_join(pot, by="Potential") %>%
+ .$pot_
+ 
+mean_rmse_pot <- rmse(pred_pot, validation$Value, na.rm=TRUE)
+mean_rmse_pot
+
+#Age Effect
+old <- test %>% 
+group_by(Age) %>% 
+summarise(old_ = mean(Value - mu_test))
+
+pred_old <- mu_test + validation %>% 
+left_join(old, by="Age") %>%
+ .$old_
+ 
+mean_rmse_old <- rmse(pred_old, validation$Value, na.rm=TRUE)
+mean_rmse_old
+```
+Increased Mean Square Error (%IncMSE) provides the prediction ability of mean square error with randomly permuted variables, while IncNodePurity calculates the loss function when best splits are selected. From figure 17 we can observe that the variables that are most important in predicting (those having the highest %IncMSE) are potential and age, then total statistics. This goes in line with the work that we did, and with obervations we made earlier, that made us choose these variables in that order for our predictions.
+
+
+## 4.	Conclusions
+### 4.1 Future Work
+In this project, we went through data related to football players in FIFA 2021, by exploring it and trying to predict players value with the help of a number of variables. Although the aim of this project was reached, I believe that there is room for future work, that can improved the results of this work.
+
+First of all, the dataset (of roughly 17.000 rows) was rather small, and the fact that some variables had a huge range (total statistics and clubs) affected the prediction ability and resulted on a high RMSE. In the future, one could concentrate on other variable to test the predictions with, such as rating or nationality, that have a much smaller range (although they cannot be as big in importance compared with the two others). The fact that some of the data was categorical and not normalized could also have created a risk for over-fitting data.
+
+For the future, it could also be interesting to give more time to the initial dataset (with 107 columns), and investigate the different variables in detail, which would for sure help having a much better accuracy in the predictions. Unfortunately, and as this project has time constraints, this operation was not possible, but this could definitely be reached in future projects.
